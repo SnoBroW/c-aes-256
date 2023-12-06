@@ -13,7 +13,7 @@ void addroundkey(unsigned char ***, int, unsigned char *);
 
 void encryptround(unsigned char ***, int, unsigned char *);
 
-void aesencrypt(unsigned char *, unsigned char *, unsigned char *);
+void aesencrypt(unsigned char *, unsigned char *);
 
 
 #endif

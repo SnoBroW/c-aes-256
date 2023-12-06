@@ -9,8 +9,7 @@ int main(int argc, char *argv[]) {
     fgets((char *) string, 1024, stdin);
 
     unsigned char *key = (unsigned char *) "aledaledaledaled";
-    unsigned char *iv = (unsigned char *) "aled";
-    aesencrypt(string, key, iv);
+    aesencrypt(string, key);
 
 
     return 0;

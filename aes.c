@@ -30,18 +30,32 @@ void subbytes(unsigned char *** block, int blocks) {
     }
 }
 
+//void shiftrows(unsigned char *** block, int blocks) {
+//    unsigned char temp[4];
+//    for (unsigned char i = 0; i < blocks; i++) {
+//        for (unsigned char j = 0; j < 4; j++) {
+//            for (unsigned char k = 0; k < 4; k++) {
+//                temp[k] = block[i][(k + j) % 4][j];
+//            }
+//            for (int k = 0; k < 4; k++) {
+//                block[i][j][k] = temp[k];
+//            }
+//        }
+//    }
+//}
+
 void shiftrows(unsigned char *** block, int blocks) {
-    unsigned char temp[4];
-    for (unsigned char i = 0; i < blocks; i++) {
-        for (unsigned char j = 0; j < 4; j++) {
-            for (unsigned char k = 0; k < 4; k++) {
-                temp[k] = block[i][j][(k + j) % 4];
+    unsigned char temp[4][4];
+    for (int i = 0; i < blocks; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            for (int k = 0; k < 4; ++k) {
+                temp[j][k] = block[i][(k + j) % 4][k];
             }
-            for (int k = 0; k < 4; k++) {
-                block[i][j][k] = temp[k];
+        }
+        for (int j = 0; j < 4; ++j) {
+            for (int k = 0; k < 4; ++k) {
+                block[i][j][k] = temp[j][k];
             }
-            // (k + j) % 4 -> source byte
-            // (k - j + 4) % 4 -> destination byte
         }
     }
 }
@@ -81,11 +95,11 @@ void mixcolumns(unsigned char *** block, int blocks) {
     for (int i = 0; i < blocks; i++) {
         for (int j = 0; j < 4; j++) {
             for(int k = 0; k < 4; k++) {
-                temp[k] = block[i][k][j];
+                temp[k] = block[i][j][k];
             }
             mixcolumn(temp);
             for(int k = 0; k < 4; k++) {
-                block[i][k][j] = temp[k];
+                block[i][j][k] = temp[k];
             }
         }
     }
@@ -100,12 +114,25 @@ void addroundkey(unsigned char *** block, int blocks, unsigned char ** key, int 
     }
 }
 
-void encryptround(unsigned char *** block, int blocks, unsigned char ** key, int atround) {
+void xor(byte *** block, int id, byte ** toxor){
+    for (int j = 0; j < 4; ++j) {
+        for (int k = 0; k < 4; ++k) {
+            block[id][j][k] ^= toxor[j][k];
+        }
+    }
+}
+
+void encryptround(byte *** block, int blocks, byte ** key, int atround) {
+
+    if(atround == 0) {
+        xor(block, 0, key);
+    }
+
     subbytes(block, blocks);
 
     shiftrows(block, blocks);
 
-    if(atround != 10) {
+    if(atround != 9) {
         mixcolumns(block, blocks);
     }
 
@@ -113,7 +140,8 @@ void encryptround(unsigned char *** block, int blocks, unsigned char ** key, int
 }
 
 
-void aesencrypt(unsigned char * data, unsigned char * keystring, unsigned char * iv) {
+
+void aesencrypt(unsigned char * data, unsigned char * keystring) {
 
     int blocks = getblockcount(data);
     unsigned char *** block = getblock(data, blocks);
@@ -121,19 +149,13 @@ void aesencrypt(unsigned char * data, unsigned char * keystring, unsigned char *
     int wordcount = getwordcount(keystring);
     unsigned char ** key = getkey(keystring, wordcount);
 
-    printblocks(block, blocks);
 
-    for (int j = 0; j < 4; ++j) {
-        for (int k = 0; k < 4; ++k) {
-            block[0][j][k] ^= key[j][k];
-        }
-    }
 
     for (int i = 0; i < 10; ++i) {
-        encryptround(block, blocks, key, i + 1);
+        encryptround(block, blocks, key, i);
     }
 
-    printblocks(block, blocks);
+    printkey(block[0], 4);
 
     freeblocks(block, blocks);
     freekey(key, wordcount);
