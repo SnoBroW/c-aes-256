@@ -1,12 +1,23 @@
 #ifndef AES_UTIL_H
 #define AES_UTIL_H
 
-int getdatalength(unsigned char * _string);
-int getblockcount(unsigned char * _string);
+#include "structs.h"
 
-void printblocks(unsigned char ***block, int blocks);
+int getdatalength(byte *);
+int getblockcount(byte *);
+int getwordcount(byte *);
 
-unsigned char ***getblock(unsigned char *_string, int blocks);
-void freeblocks(unsigned char ***block, int blocks);
+void printblocks(byte ***, int);
+void printkey(byte **, int);
+
+Block * newblock();
+Message * newemptymessage();
+
+byte *** getblock(byte *, int);
+byte ** getkey(byte *, int);
+
+void freeblocks(byte ***, int);
+void freekey(byte **, int);
+void freestring(byte *);
 
 #endif
