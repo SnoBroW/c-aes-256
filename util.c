@@ -1,9 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "structs.h"
-
+#include "util.h"
 
 int getdatalength(byte * _string){
     return (strlen((char *) _string));
@@ -63,6 +59,16 @@ Block * newblock() {
     return block;
 }
 
+Block * getblock(byte * bytes) {
+    Block * block = newblock();
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            block->data[i][j] = bytes[i * 4 + j];
+        }
+    }
+    return block;
+}
+
 void appendblock(Message * message, Block * toadd) {
     if(message->first == NULL) {
         message->first = toadd;
@@ -72,6 +78,14 @@ void appendblock(Message * message, Block * toadd) {
         toadd->prev = oldlast;
     }
     message->last = toadd;
+}
+
+void xorblocks(Block * block1, Block * block2) {
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            block1->data[i][j] ^= block2->data[i][j];
+        }
+    }
 }
 
 Message * createmessage(byte *_string) {
@@ -136,6 +150,29 @@ KeySchedule * createkeyschedule(byte * _string) {
     }
 
     return keySchedule;
+}
+
+void applytoinputptr(byte * input, Message * message) {
+    Block * current = message->first;
+    int counter = 0;
+    while (current != NULL) {
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                if(counter < message->size * 16) {
+                    input[counter++] = current->data[i][j];
+                }
+            }
+        }
+        current = current->next;
+    }
+}
+
+void freeblock(Block * block) {
+    for (int i = 0; i < 4; ++i) {
+        free(block->data[i]);
+    }
+    free(block->data);
+    free(block);
 }
 
 void freemessage(Message * message) {

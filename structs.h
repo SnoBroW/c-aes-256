@@ -4,6 +4,17 @@
 
 typedef unsigned char byte;
 
+typedef enum mode { ECB, CBC } Mode;
+typedef enum output { HEX, RAW } Output;
+
+typedef struct options {
+    Mode mode;
+    Output output;
+    int keysize;
+    byte * key;
+    byte * iv;
+} Options;
+
 typedef struct block {
     byte ** data;
     byte id;

@@ -1,7 +1,4 @@
-#include "const.h"
-#include "util.h"
-
-#include <stdlib.h>
+#include "aes.h"
 
 typedef unsigned char bool;
 
@@ -132,33 +129,25 @@ void computekeyschedule(KeySchedule * keySchedule) {
     }
 }
 
-void subbytes(Message * message) {
-    Block * current = message->first;
-    while(current != NULL) {
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                current->data[i][j] = sbox[current->data[i][j] / 16][current->data[i][j] % 16];
-            }
+void subbytes(Block * block) {
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            block->data[i][j] = sbox[block->data[i][j] / 16][block->data[i][j] % 16];
         }
-        current = current->next;
     }
 }
 
-void shiftrows(Message * message) {
+void shiftrows(Block * block) {
     byte temp[4][4];
-    Block * current = message->first;
-    while (current != NULL) {
-        for (int j = 0; j < 4; ++j) {
-            for (int k = 0; k < 4; ++k) {
-                temp[j][k] = current->data[(k + j) % 4][k];
-            }
+    for (int j = 0; j < 4; ++j) {
+        for (int k = 0; k < 4; ++k) {
+            temp[j][k] = block->data[(k + j) % 4][k];
         }
-        for (int j = 0; j < 4; ++j) {
-            for (int k = 0; k < 4; ++k) {
-                current->data[j][k] = temp[j][k];
-            }
+    }
+    for (int j = 0; j < 4; ++j) {
+        for (int k = 0; k < 4; ++k) {
+            block->data[j][k] = temp[j][k];
         }
-        current = current->next;
     }
 }
 
@@ -192,68 +181,80 @@ void mixcolumn(byte *column) {
     }
 }
 
-void mixcolumns(Message * message) {
+void mixcolumns(Block * block) {
     unsigned char temp[4];
-    Block * current = message->first;
-    while (current != NULL) {
-        for (int j = 0; j < 4; j++) {
-            for(int k = 0; k < 4; k++) {
-                temp[k] = current->data[j][k];
-            }
-            mixcolumn(temp);
-            for(int k = 0; k < 4; k++) {
-                current->data[j][k] = temp[k];
-            }
+    for (int j = 0; j < 4; j++) {
+        for(int k = 0; k < 4; k++) {
+            temp[k] = block->data[j][k];
         }
-        current = current->next;
-    }
-}
-
-void addroundkey(Message * message, RoundKey * roundKey) {
-    Block * current = message->first;
-    while (current != NULL) {
-        for (int j = 0; j < 4; ++j) {
-            for (int k = 0; k < 4; ++k) {
-                current->data[j][k] ^= roundKey->value[j][k];
-            }
+        mixcolumn(temp);
+        for(int k = 0; k < 4; k++) {
+            block->data[j][k] = temp[k];
         }
-        current = current->next;
     }
 }
 
-void encryptround(Message * message, KeySchedule * keySchedule, int atround) {
-
-    if(atround == 0) {
-        addroundkey(message, keySchedule->roundkeys[0]);
-        return;
+void addroundkey(Block * block, RoundKey * roundKey) {
+    for (int j = 0; j < 4; ++j) {
+        for (int k = 0; k < 4; ++k) {
+            block->data[j][k] ^= roundKey->value[j][k];
+        }
     }
-
-    subbytes(message);
-
-    shiftrows(message);
-
-    if(atround != keySchedule->rounds - 1) {
-        mixcolumns(message);
-    }
-
-    addroundkey(message, keySchedule->roundkeys[atround]);
 }
 
+void encryptblock(Block * block, KeySchedule * keySchedule) {
 
-void aesencrypt(unsigned char * data, unsigned char * keystring) {
+    addroundkey(block, keySchedule->roundkeys[0]);
+
+    for (int round = 1; round < keySchedule->rounds; ++round) {
+        subbytes(block);
+        shiftrows(block);
+        if(round != keySchedule->rounds - 1) {
+            mixcolumns(block);
+        }
+        addroundkey(block, keySchedule->roundkeys[round]);
+    }
+}
+
+void aesECBencrypt(unsigned char * data, unsigned char * keystring) {
 
     Message * message = createmessage(data);
 
     KeySchedule * keyschedule = createkeyschedule(keystring);
     computekeyschedule(keyschedule);
 
-    for (int round = 0; round < keyschedule->rounds; ++round) {
-        encryptround(message, keyschedule, round);
+    Block * current = message->first;
+
+    while(current != NULL) {
+        encryptblock(current, keyschedule);
+        current = current->next;
     }
 
-    printmessage(message);
+    applytoinputptr(data, message);
 
     freekeyschedule(keyschedule);
     freemessage(message);
-    freestring(data);
+}
+
+
+void aesCBCencrypt(byte * data, byte * keystring, byte * iv) {
+    Message * message = createmessage(data);
+
+    KeySchedule * keyschedule = createkeyschedule(keystring);
+    computekeyschedule(keyschedule);
+
+    Block * ivblock = getblock(iv);
+    Block * current = message->first;
+
+    while(current != NULL) {
+        xorblocks(current, current->prev == NULL ? ivblock : current->prev);
+        encryptblock(current, keyschedule);
+        current = current->next;
+    }
+
+    applytoinputptr(data, message);
+
+    freekeyschedule(keyschedule);
+    freemessage(message);
+    freeblock(ivblock);
 }
