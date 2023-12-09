@@ -13,38 +13,35 @@ int getblockcount(byte * _string){
     return (getdatalength(_string) / 16 + 1);
 }
 
-int getwordcount(byte * _string){
-    return (getdatalength(_string) / 4);
+int getkeysize(byte * _string){
+    return (getdatalength(_string) * 8);
 }
 
-void printblocks(byte ***block, int blocks) {
-    for (int i = 0; i < blocks; i++) {
-        for (int j = 0; j < 4; j++) {
-            for (int k = 0; k < 4; k++) {
-                printf("%02x ", block[i][j][k]);
+void printmessage(Message * message) {
+    Block * current = message->first;
+    while(current != NULL) {
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                printf("%02x", current->data[i][j]);
             }
-            printf("\n");
         }
+        current = current->next;
     }
 }
 
-void printkey(byte ** key, int wordcount) {
-    for (int i = 0; i < wordcount; ++i) {
+void printroundkey(RoundKey * roundKey) {
+    for (int i = 0; i < roundKey->wordcount; ++i) {
         for (int j = 0; j < 4; ++j) {
-            printf("%02x", key[i][j]);
+            printf("%02x", roundKey->value[i][j]);
         }
     }
 }
 
-Block * newblock() {
-    Block * block = malloc(sizeof(Block));
-    block->next = NULL;
-    block->prev = NULL;
-    block->data = malloc(4 * sizeof(byte));
-    for (int i = 0; i < 4; ++i) {
-        block->data[i] = malloc(sizeof(byte));
+void printkeyschedule(KeySchedule * keySchedule) {
+    for (int i = 0; i < keySchedule->rounds; ++i) {
+        printroundkey(keySchedule->roundkeys[i]);
+        printf("\n");
     }
-    return block;
 }
 
 Message * newemptymessage(int size) {
@@ -55,64 +52,120 @@ Message * newemptymessage(int size) {
     return message;
 }
 
-byte *** getblock(byte *_string, int blocks) {
-    int counter = 0;
-    int len = getdatalength(_string);
-
-    byte *** block = malloc(blocks * sizeof(byte **));
-
-    for (int i = 0; i < blocks; i++) {
-        block[i] = malloc(4 * sizeof(byte *));
-        for (int j = 0; j < 4; j++) {
-            block[i][j] = malloc(4 * sizeof(byte));
-        }
+Block * newblock() {
+    Block * block = malloc(sizeof(Block));
+    block->next = NULL;
+    block->prev = NULL;
+    block->data = malloc(4 * sizeof(byte *));
+    for (int i = 0; i < 4; ++i) {
+        block->data[i] = malloc(4 * sizeof(byte));
     }
-
-    for (int i = 0; i < blocks; i++) {
-        for (int j = 0; j < 4; j++) {
-            for (int k = 0; k < 4; k++) {
-                block[i][j][k] = counter < len ? _string[counter] : 16 - (len % 16);
-                counter++;
-            }
-        }
-    }
-
     return block;
 }
 
-byte ** getkey(byte * _string, int wordcount) {
+void appendblock(Message * message, Block * toadd) {
+    if(message->first == NULL) {
+        message->first = toadd;
+    } else {
+        Block * oldlast = message->last;
+        oldlast->next = toadd;
+        toadd->prev = oldlast;
+    }
+    message->last = toadd;
+}
+
+Message * createmessage(byte *_string) {
     int counter = 0;
+    int len = getdatalength(_string);
+    int blocks = getblockcount(_string);
+    Block * block = NULL;
 
-    byte ** key = malloc(wordcount * sizeof(byte *));
+    Message * message = newemptymessage(blocks);
+    message->size = blocks;
 
-    for (int i = 0; i < wordcount; i++) {
-        key[i] = malloc(4 * sizeof(byte));
-    }
-
-    for (int i = 0; i < wordcount; i++) {
-        for (int j = 0; j < 4; j++) {
-            key[i][j] = _string[counter++];
-        }
-    }
-
-    return key;
-}
-
-void freeblocks(byte ***block, int blocks) {
     for (int i = 0; i < blocks; i++) {
+        block = newblock();
         for (int j = 0; j < 4; j++) {
-            free(block[i][j]);
+            for (int k = 0; k < 4; k++) {
+                block->data[j][k] = counter < len ? _string[counter] : 16 - (len % 16);
+                block->id = i;
+                counter++;
+            }
         }
-        free(block[i]);
+        appendblock(message, block);
     }
-    free(block);
+
+    return message;
 }
 
-void freekey(byte ** key, int wordcount){
-    for (int i = 0; i < wordcount; i++){
-            free(key[i]);
+RoundKey * newroundkey(int round, int keysize) {
+    RoundKey * roundKey = malloc(sizeof(RoundKey));
+    roundKey->wordcount = keysize / 32;
+    roundKey->round = round;
+
+    roundKey->value = malloc(roundKey->wordcount * sizeof(byte *));
+    for (int i = 0; i < roundKey->wordcount; ++i) {
+        roundKey->value[i] = malloc(4 * sizeof(byte));
     }
-    free(key);
+
+    return roundKey;
+}
+
+KeySchedule * newemptykeyschedule(int keysize) {
+    KeySchedule * keySchedule = malloc(sizeof(KeySchedule));
+    keySchedule->keysize = keysize;
+    keySchedule->rounds = ((keysize / 64) - 1) * 2 + 9;
+    keySchedule->roundkeys = malloc(keySchedule->rounds * sizeof(RoundKey *));
+    return keySchedule;
+}
+
+KeySchedule * createkeyschedule(byte * _string) {
+    int keysize = getkeysize(_string);
+
+    KeySchedule * keySchedule = newemptykeyschedule(keysize);
+    keySchedule->roundkeys[0] = newroundkey(0, keysize);
+
+    for (int i = 0; i < keySchedule->roundkeys[0]->wordcount; i++) {
+        for (int j = 0; j < 4; j++) {
+            keySchedule->roundkeys[0]->value[i][j] = _string[i * 4 + j];
+        }
+    }
+
+    for (int i = 1; i < keySchedule->rounds; ++i) {
+        keySchedule->roundkeys[i] = newroundkey(i, 128);
+    }
+
+    return keySchedule;
+}
+
+void freemessage(Message * message) {
+    Block * current = message->first;
+    while(current != NULL) {
+        for (int i = 0; i < 4; ++i) {
+            free(current->data[i]);
+        }
+        free(current->data);
+        if(current->next != NULL) {
+            current = current->next;
+            free(current->prev);
+        } else {
+            free(current);
+            current = NULL;
+        }
+    }
+    free(message);
+}
+
+void freekeyschedule(KeySchedule * keySchedule){
+    for (int i = 0; i < keySchedule->rounds; ++i) {
+        for (int j = 0; j < keySchedule->roundkeys[i]->wordcount; ++j) {
+            free(keySchedule->roundkeys[i]->value[j]);
+        }
+        free(keySchedule->roundkeys[i]->value);
+        free(keySchedule->roundkeys[i]);
+    }
+    free(keySchedule->roundkeys);
+    free(keySchedule);
 }
 
 void freestring(byte * _string) {

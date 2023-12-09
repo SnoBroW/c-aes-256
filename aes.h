@@ -1,19 +1,24 @@
 #ifndef AES_H
 #define AES_H
 
+#include "structs.h"
 
+void computeroundkey128(RoundKey * input, RoundKey * output);
+void computekeyschedule128(KeySchedule *);
+void computekeyschedule192(KeySchedule *);
+void computekeyschedule256(KeySchedule *);
 
-void computenextkey(unsigned char **, int, int);
+void computekeyschedule(KeySchedule * keySchedule);
 
-void subbytes(unsigned char ***, int);
-void shiftrows(unsigned char ***, int);
-void mixcolumn(unsigned char *);
-void mixcolumns(unsigned char ***, int );
-void addroundkey(unsigned char ***, int, unsigned char *);
+void subbytes(Message *);
+void shiftrows(Message *);
+void mixcolumn(byte *);
+void mixcolumns(Message *);
+void addroundkey(Message *, RoundKey *);
 
-void encryptround(unsigned char ***, int, unsigned char *);
+void encryptround(Message *, KeySchedule *, int round);
 
-void aesencrypt(unsigned char *, unsigned char *);
+void aesencrypt(unsigned char * message, unsigned char * key);
 
 
 #endif

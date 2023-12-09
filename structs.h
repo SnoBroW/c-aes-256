@@ -17,14 +17,20 @@ typedef struct message {
     int size;
 } Message;
 
+typedef struct word {
+    byte value[4];
+} Word;
+
 typedef struct roundkey {
     byte ** value;
+    int wordcount;
     unsigned int round;
 } RoundKey;
 
 typedef struct keyschedule {
-    RoundKey * roundkeys;
-    int wordcount;
+    RoundKey ** roundkeys;
+    int rounds;
+    int keysize;
 } KeySchedule;
 
 

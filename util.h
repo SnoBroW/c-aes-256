@@ -5,19 +5,24 @@
 
 int getdatalength(byte *);
 int getblockcount(byte *);
-int getwordcount(byte *);
+int getkeysize(byte *);
 
-void printblocks(byte ***, int);
-void printkey(byte **, int);
+void printmessage(Message *);
+void printroundkey(RoundKey *);
+void printkeyschedule(KeySchedule *);
 
+Message * newemptymessage(int);
 Block * newblock();
+void appendblock(Message *, Block *);
 Message * newemptymessage();
+Message * createmessage(byte *);
 
-byte *** getblock(byte *, int);
-byte ** getkey(byte *, int);
+RoundKey * newroundkey(int round, int keysize);
+KeySchedule * newemptykeyschedule(int);
+KeySchedule * createkeyschedule(byte *);
 
-void freeblocks(byte ***, int);
-void freekey(byte **, int);
+void freemessage(Message *);
+void freekeyschedule(KeySchedule *);
 void freestring(byte *);
 
 #endif
